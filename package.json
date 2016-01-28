@@ -1,0 +1,22 @@
+{
+  "name": "thetacontroller",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yasnis/ThetaController.git"
+  },
+  "author": "yasnis",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yasnis/ThetaController/issues"
+  },
+  "homepage": "https://github.com/yasnis/ThetaController#readme",
+  "dependencies": {
+    "serialport": "^2.0.6"
+  }
+}
