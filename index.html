@@ -6,32 +6,51 @@
     <script type="text/javascript" src="js/jquery-2.2.0.min.js"></script>
     <script type="text/javascript" src="js/jquery-after.js"></script>
     <script type="text/javascript" src="js/main.js"></script>
+    <link rel="stylesheet" href="css/main.css">
   </head>
   <body>
-    <h1>Theta Controller</h1>
-    We are using node <script>document.write(process.versions.node)</script>,
-    Chrome <script>document.write(process.versions.chrome)</script>,
-    and Electron <script>document.write(process.versions.electron)</script>.
-    <h2>Theta Status</h2>
+      <h1>Theta Controller</h1>
+      <section id="step_01">
+          <h2>Step 01 : Thetaに接続する</h2>
+          <p>Thetaを探しています<span>.....</span>(5秒毎に更新)</p>
+          <ul>
+              <li><input type="button" value="Connect" id="thetaStartSession" disabled="disabled"></input></li>
+          </ul>
+      </section>
+      <hr />
+      <section id="step_02">
+          <h2>Step 02 : レールのコントローラーに接続する</h2>
+          <ul>
+              <li><select name="serialPortList" id="serialPortList" disabled="disabled"></select><input type="button" value="Connect." id="releaseConnectButton" disabled="disabled"></input></li>
+              <li><input type="button" value="この手順をスキップする" id="releaseSkipButton"></input></li>
+          </ul>
+      </section>
+      <hr />
+      <section id="step_03">
+          <h2>Step 03 : Thetaを操作する</h2>
+      </section>
+
     <ul id="statusButtons">
-        <li><input type="button" value="Check Information." id="thetaCheckInformation"></input></li>
-        <li><input type="button" value="Start Session." id="thetaStartSession"></input></li>
+        <li><input type="text" value="Download Directory." id="thetaDownloadDirectory" disabled="disabled"></input><input type="button" value="画像の保存先を選択" id="thetaSetDownloadDirectory" disabled="disabled"></input></li>
+        <!-- <li><input type="button" value="Check Information." id="thetaCheckInformation"></input></li> -->
+        <!-- <li><input type="button" value="Start Session." id="thetaStartSession"></input></li> -->
         <!-- <li><input type="button" value="Check Status." id="thetaCheckStatus"></input></li> -->
         <!--li><input type="button" value="Get Live View." id="thetaGetLiveView"></input></li>
         <li><input type="button" value="Get Camera Options." id="thetaGetCameraOptions"></input></li>
         <li><input type="button" value="Set Camera Options." id="thetaSetCameraOptions"></input><br />
             <textarea  cols="40" rows="4" maxlength="20" id="thetaOptions"></textarea></li-->
-        <li><input type="button" value="Shoot Image." id="thetaShootStill"></input><input type="checkbox" id="thetaLoadWithShoot">Auto load.</input></li>
+        <li><input type="button" value="Shoot Image." id="thetaShootImage" disabled="disabled"></input></li>
         <!-- <li><input type="button" value="Shoot movie." id="thetaShootMovie"></input></li> -->
         <!-- <li><input type="button" value="Stop movie." id="thetaStopMovie"></input></li> -->
         <!-- <li><input type="button" value="Check for updates." id="thetaCheckForUpdates"></input></li> -->
-        <li><input type="button" value="Refresh Image List." id="thetaRefreshImageList"></input></li>
-        <li><input type="button" value="Load All images." id="thetaLoadAllImages"></input></li>
+        <li><input type="button" value="Refresh Image List." id="thetaRefreshImageList" disabled="disabled"></input></li>
+        <li><input type="button" value="Load All images." id="thetaLoadAllImages" disabled="disabled"></input></li>
+        <li><input type="button" value="Load Selected images." id="thetaLoadSelectedImages" disabled="disabled"></input></li>
+        <li><select name="thetaNotLoadedList" multiple size="4" id="thetaNotLoadedList"><option disabled="disabled">Image list not loaded.</option></select></li>
         <!-- <li><input type="button" value="Save Config." id="saveConfig"></input></li> -->
-        <li><input type="text" value="Download Directory." id="thetaDownloadDirectory" disabled="disabled"></input><input type="button" value="保存先を指定" id="thetaSetDownloadDirectory"></input></li>
-        <hr>
-        <li><input type="button" value="Connect Release Button." id="connectReleaseButton"></input></li>
-        <li><select name="serialPortList" id="serialPortList"></select></li>
+        <!-- <hr> -->
+        <!-- <li><input type="button" value="Connect Release Button." id="connectReleaseButton"></input></li> -->
+        <!-- <li><select name="serialPortList" id="serialPortList"></select></li> -->
     </ul>
     <div><canvas id="thetaLiveView" width="640px" height="320px"></div>
   </body>

@@ -1,6 +1,30 @@
 /*
+$(function(){
+       function test() {
+           $.ajax({
+               url: 'http://192.168.1.1/osc/stat',
+               type:'post',
+               data:null,
+               contentType: 'application/json',
+               dataType: 'json',
+               timeout:10000,
+               success: function (data){
+                            console.log("success", data);
+               },
+               error:function (data){
+                            console.log("error", data);
+               }
+           });
+       }
+       // test();
+       sendMessage("/osc/state");
+});
+*/
+
+/*
  * Load module.
  */
+//*
 var fs = require('fs');
 var serialport = require('serialport');
 var SerialPort = serialport.SerialPort;
@@ -9,56 +33,7 @@ var request = require('request');
 var mkdirp = require("mkdirp");
 var getDirName = require("path").dirname;
 var app = remote.require('app');
-
-/*
-var MjpegConsumer = require("mjpeg-consumer");
-var FileOnWrite = require("file-on-write");
-var writer = new FileOnWrite({
-    path: './video',
-    ext: '.jpg'
-});
-var consumer = new MjpegConsumer();
-// get session id
-var sessionId = '';
-
-var StreamViewer = new StreamViewer()
-var index = 0;
-StreamViewer.on('data', function(data) {
-  index++;
-  console.log(index + ': ' + data);
-});
-
-request({
-   method: 'POST',
-   uri: 'http://192.168.1.1:80/osc/commands/execute',
-   body: JSON.stringify({
-      name: "camera.startSession",
-      parameters: {}
-   })
-}, function (error, response, body) {
-  if (!error && response.statusCode == 200) {
-     var result = JSON.parse(body);
-     sessionId = result.results.sessionId;
-    console.log(result, result.results.sessionId);
-
-    console.log('getting the preview')
-   request({
-      method: 'POST',
-      uri: 'http://192.168.1.1:80/osc/commands/execute',
-      body: JSON.stringify({
-         name: "camera._getLivePreview",
-         parameters: {
-            "sessionId": sessionId
-         }
-      })
-   }).pipe(consumer).pipe(writer);
-
-  } else {
-     console.log(error, body);
-  }
-});
-*/
-//*
+var dialog = remote.require('dialog');
 
 var currentRequest;
 var oldState = 0;
@@ -78,115 +53,27 @@ var config = {
 var imagelist = new Array();
 var loadedlist = new Array();
 var notloadedlist = new Array();
-var loadingImage;
-var loadAllImageList = true;
+// var loadingImage;
+// var loadAllImageList = true;
 var lastShotImage = "";
+
+var loadlist;
 
 $(function(){
     loadConfig();
     $(window).on("beforeunload",function(e){
         saveConfig();
     });
-    checkSerialPort();
-    initializeEvent();
+    // checkSerialPort();
+    // initializeEvent();
+    step1();
+    step3();
 });
 
+
 /*
- * Interface Handling.
+ * Step 00
  */
- //イベントを初期化する
- function initializeEvent() {
-     $("#statusButtons input").on("click",function () {
-         console.log(this.id);
-         // $(data.currentTarget).attr("id");
-         var url;
-         var obj = {};
-         currentRequest = this.id;
-         switch (currentRequest) {
-             case "thetaStartSession":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera.startSession";
-                 obj.parameters = {};
-                 break;
-             case "thetaCheckStatus":
-                 url = "/osc/state";
-                 break;
-             case "thetaGetLiveView":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera._getLivePreview";
-                 obj.parameters = {
-                     "sessionId": config.SID
-                 };
-                 break;
-             case "thetaGetCameraOptions":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera.getOptions";
-                 obj.parameters = {
-                     "sessionId": config.SID,
-                     "optionNames": [
-                         "fileFormat",
-                         "fileFormatSupport"
-                     ]
-                 };
-                 break;
-             case "thetaSetCameraOptions":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera.setOptions";
-                 obj.parameters = {
-                     "sessionId": config.SID,
-                      "options": {
-                          "fileFormat": {
-                              "type": "jpeg",
-                              "width": 2048,
-                              "height": 1024
-                          }
-                      }
-                 };
-                 break;
-             case "thetaShootStill":
-                 shootImage();
-                 return;
-                 break;
-             case "thetaLoadAllImages":
-                 loadAllImages();
-                 return;
-                 break;
-             case "thetaShootMovie":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera._startCapture";
-                 obj.parameters = {
-                         "sessionId": config.SID
-                     };
-                 break;
-             case "thetaStopMovie":
-                 url = "/osc/commands/execute";
-                 obj = {
-                     "stateFingerprint":config.fingerprint
-                 }
-                 break;
-             case "thetaCheckForUpdates":
-                 url = "/osc/checkForUpdates";
-                 console.log(config.fingerprint);
-                 obj = {
-                     "stateFingerprint":config.fingerprint
-                     };
-                 break;
-             case "saveConfig":
-                 saveConfig();
-                 return;
-                 break;
-             case "connectReleaseButton":
-                 connectSerialPort($('#serialPortList option:selected').text());
-                 return;
-                 break;
-             default:
-
-         }
-         sendMessage(url, obj);
-     })
- }
-
-
  /*
   * Load/Save Config File.
   */
@@ -207,6 +94,8 @@ $(function(){
                      return ;
                  }
                  config = JSON.parse(data.toString());
+                 console.log("download_path : ", config.download_path);
+                 $("#thetaDownloadDirectory").attr("value", config.download_path);
              });
          }
      });
@@ -221,10 +110,81 @@ $(function(){
      });
  }
 
+/*
+ * Step 01
+ */
+function step1() {
+    console.log("-----------------------------");
+    console.log("-----------Step 01-----------");
+    console.log("-----------------------------");
+    searchTheta();
+}
+//Thetaを探す
+function searchTheta() {
+    console.log("searchTheta");
+    var url = "/osc/info";
+    var obj = {};
+    /* TODO:ループ表現
+    function loading() {
+        var txt = $("#step_01 p span").text().lengh;
+        console.log($("#step_01 p span").text());
+    }
+    loading();
+    */
+    sendMessage(url, obj, function(data){
+            console.log("searchTheta(success) : ", data);
+            $("#step_01 p").text("Thetaが見つかりました。");
+            $("#thetaStartSession").removeAttr("disabled");
+            $("#thetaStartSession").on("click", startSession);
+        },function(data){
+            console.log("searchTheta(error) : ", data);
+            //5秒待って再試行
+            setTimeout(searchTheta, 5000);
+        },
+        "get"
+    );
+}
+
+function startSession(){
+    console.log("startSession");
+    $("#thetaStartSession").attr("disabled", "disabled");
+    $("#thetaStartSession").attr("value", "接続中です");
+    $("#thetaStartSession").off("click");
+
+    var url = "/osc/commands/execute";
+    var obj = {};
+    obj.name = "camera.startSession";
+    obj.parameters = {};
+    sendMessage(url, obj, function(data){
+        console.log("startSession(success) : ", data);
+        $("#thetaStartSession").attr("value", "接続完了");
+        config.SID = data.results.sessionId;
+        step2();
+    },function(data){
+        console.log("startSession(error) : ", data);
+        $("#step_01 p").text("Thetaが見つかりました。");
+        $("#thetaStartSession").removeAttr("disabled");
+        $("#thetaStartSession").on("click", startSession);
+    });
+}
+/*
+ * Step 02
+ */
+function step2() {
+    console.log("-----------------------------");
+    console.log("-----------Step 02-----------");
+    console.log("-----------------------------");
+    checkSerialPort();
+    $("#releaseSkipButton").on('click', function () {
+        step3();
+        $("#releaseSkipButton").off('click');
+    })
+}
+
  /*
   * Serial Communication.
   */
- 
+
 //有効なシリアルポートを調べる
 function checkSerialPort() {
     console.log("checkSerialPort");
@@ -237,13 +197,17 @@ function checkSerialPort() {
             if (port.comName.indexOf("usb")!=-1) {
                 dom.prop('selected', true);
                 availablePort = port.comName;
-                console.lo("Selected port : ", port.comName);
+                console.log("Selected port : ", port.comName);
             }
             $("#serialPortList").append(dom);
         });
 
-        //有効なポートがあったら接続する
-        if(availablePort) connectSerialPort(availablePort);
+        $("#serialPortList").removeAttr("disabled");
+        $("#releaseConnectButton").removeAttr("disabled");
+        $("#releaseConnectButton").on('click',function () {
+            connectSerialPort($('#serialPortList option:selected').text());
+            step3();
+        })
     });
 }
 
@@ -272,10 +236,60 @@ function onSerial(input) {
     oldState = input;
 }
 
+/*
+ * Step 03
+ */
+function step3() {
+    console.log("-----------------------------");
+    console.log("-----------Step 03-----------");
+    console.log("-----------------------------");
+
+    setThetaButtonEnabled(true);
+
+    $("#thetaSetDownloadDirectory").on('click', setDownloadDirectory);
+    $("#thetaShootImage").on('click', shootImage);
+    $("#thetaRefreshImageList").on('click', function () {
+        setThetaButtonEnabled(false);
+        loadImageList(0);
+    });
+    $("#thetaLoadAllImages").on('click', loadAllImages);
+    $("#thetaLoadSelectedImages").on('click', loadSelectedImages);
+}
+function setThetaButtonEnabled(b) {
+    if(b){
+        $("#thetaSetDownloadDirectory").removeAttr("disabled");
+        $("#thetaShootImage").removeAttr("disabled");
+        $("#thetaRefreshImageList").removeAttr("disabled");
+        $("#thetaLoadAllImages").removeAttr("disabled");
+        $("#thetaLoadSelectedImages").removeAttr("disabled");
+        $("#thetaNotLoadedList").removeAttr("disabled");
+    }else{
+        $("#thetaSetDownloadDirectory").attr("disabled", "disabled");
+        $("#thetaShootImage").attr("disabled", "disabled");
+        $("#thetaRefreshImageList").attr("disabled", "disabled");
+        $("#thetaLoadAllImages").attr("disabled", "disabled");
+        $("#thetaLoadSelectedImages").attr("disabled", "disabled");
+        $("#thetaNotLoadedList").attr("disabled", "disabled");
+    }
+}
+
+//画像をダウンロードするフォルダを指定
+function setDownloadDirectory(){
+    setThetaButtonEnabled(false);
+    dialog.showOpenDialog({ properties: [ 'openDirectory']}, function (data) {
+        if(data[0]){
+            config.download_path = data[0]+"/";
+            console.log(config.download_path);
+            setThetaButtonEnabled(true);
+        }
+    });
+}
+
 //撮影する
 function shootImage(){
-    currentRequest = "thetaShootStill";
-    console.log("shootImage : ", lastShotImage);
+    setThetaButtonEnabled(false);
+    // currentRequest = "thetaShootStill";
+    // console.log("shootImage : ", lastShotImage);
     var url;
     var obj = {};
     url = "/osc/commands/execute";
@@ -283,23 +297,127 @@ function shootImage(){
     obj.parameters = {
             "sessionId": config.SID
         };
-    sendMessage(url, obj, false, false, false);
+    sendMessage(url, obj, function (data) {
+        console.log("shootImage(success) : ", data);
+        setTimeout(function(){setThetaButtonEnabled(true);},300);
+    }, function (data) {
+        console.log("shootImage(error) : ", data);
+        setTimeout(function(){setThetaButtonEnabled(true);},300);
+    });
+}
+
+//画像の一覧を更新する
+function loadImageList(token, num){
+    console.log("loadImageList ", num);
+    // currentRequest = "thetaLoadImageList";
+    if(num==undefined)num = 200;
+    var url;
+    var obj = {};
+    url = "/osc/commands/execute";
+    obj.name = "camera.listImages";
+    obj.parameters = {
+        "entryCount":num,
+        "includeThumb":false
+    };
+    if(token == 0){
+        imagelist = new Array();
+    }else {
+        obj.parameters.continuationToken = token;
+    }
+    console.log(obj);
+    sendMessage(url, obj, onLoadImageList, function (data) {
+        console.log("loadImageList(error) : ", data);
+        setTimeout(function(){setThetaButtonEnabled(true);},300);
+    });
+}
+
+function onLoadImageList(data) {
+    console.log("loadImageList(success) : ", data);
+    // console.log(data.results.entries);
+        // return;
+    imagelist = imagelist.concat(data.results.entries);
+    // console.log(imagelist.length);
+    if(data.results.continuationToken > 0){
+        loadImageList(data.results.continuationToken);
+    }else{
+        $("#thetaNotLoadedList option").remove();
+        // lastShotImage = imagelist[0].uri;
+        for (var i = 0; i < imagelist.length; i++) {
+            var uri = imagelist[i].uri;
+            var b = false;
+            var loaded = false;
+            var added = false;
+            for (var j = 0; j < config.loadedlist.length; j++) {
+                if(config.loadedlist[j].uri == uri){
+                    config.loadedlist.push(imagelist[i]);
+                    loaded = true;
+                    break;
+                }
+            }
+            for (var j = 0; j < config.notloadedlist.length; j++) {
+                if(config.notloadedlist[j].uri == uri){
+                    added = true;
+                    break;
+                }
+            }
+            console.log(uri, loaded, added);
+            if(!loaded){
+                console.log("not loaded : ", uri);
+                var opt = $("<option>");
+                opt.attr("value",imagelist[i].uri);
+                opt.text(imagelist[i].uri);
+                // console.log(opt);
+                // console.log($("#thetaNotLoadedList"));
+                $("#thetaNotLoadedList").append(opt);
+                if(!added){
+                    config.notloadedlist.push(imagelist[i]);
+                }
+            }
+        }
+
+        $("#thetaNotLoadedList").attr("size", Math.min(30, $("#thetaNotLoadedList option").length));
+        setTimeout(function(){setThetaButtonEnabled(true);},300);
+    }
 }
 
 //まだ読み込んでない画像を全部読み込む
 function loadAllImages() {
-    currentRequest = "thetaLoadAllImages";
+    loadlist = new Array();
+    for (var i = 0; i < config.notloadedlist.length; i++) {
+        loadlist.push(config.notloadedlist[i]);
+    }
+    // console.log("loadAllImages : ", loadlist);
+    // currentRequest = "thetaLoadAllImages";
+    loadNext();
+}
+function loadSelectedImages() {
+    setThetaButtonEnabled(false);
+    loadlist = new Array();
+    var selected = $("#thetaNotLoadedList option:selected");
+    console.log("loadSelectedImages", selected);
+    for (var i = 0; i < selected.length; i++) {
+        var uri = $(selected[i]).text();
+        for (var j = 0; i < config.notloadedlist.length; j++) {
+            if(uri == config.notloadedlist[j].uri){
+                loadlist.push(config.notloadedlist[j]);
+                break;
+            }
+        }
+    }
+    console.log("loadSelectedImages", loadlist);
     loadNext();
 }
 function loadNext(){
-    if(config.notloadedlist.length>0){
-        loadImage(config.notloadedlist.shift(), true);
+    if(loadlist.length>0){
+        loadImage(loadlist[0]);
     }else{
         console.log("loadComplete");
+        loadImageList(0);
     }
 }
-function loadImage(img, loadNext){
-    loadingImage = img;
+function loadImage(img){
+    console.log("loadImage : ", img.uri);
+    var loadingImage = img;
     var o = {
         uri: 'http://192.168.1.1/osc/commands/execute',
         headers: { 'Content-Type': 'application/json' },
@@ -317,27 +435,78 @@ function loadImage(img, loadNext){
             return;
         }
         if(response.statusCode == 200){
-            console.log(config.download_path+loadingImage.name);
-            writeFile(config.download_path+loadingImage.name, body, encoding="binary");
-            // fs.writeFile(config.download_path+loadingImage.name, body, encoding="binary");
+            console.log(config.download_path+loadingImage.uri);
+            writeFile(config.download_path+loadingImage.uri, body, encoding="binary");
             config.loadedlist.push(loadingImage);
-            if(loadNext) owner.loadNext();
+            for (var i = 0; i < config.notloadedlist.length; i++) {
+                if(config.notloadedlist[i].uri == loadingImage.uri){
+                    config.notloadedlist.splice(i,1);
+                    break;
+                }
+            }
+            loadlist.shift();
+            if(loadlist.length>0) owner.loadNext();
+            else onLoadImageComplete();
         }else{
             console.log('Connection Failure... (%d)', response.statusCode);
         }
     })
-    /*
-    var url;
-    var obj = {};
-    url = "/osc/commands/execute";
-    obj.name = "camera.getImage";
-    obj.parameters = {
-        "fileUri": loadingImage.uri
-    };
-    sendMessage(url, obj);
-    */
+}
+function onLoadImageComplete() {
+    console.log("onLoadImageComplete");
+    loadImageList(0);
 }
 
+/*
+ * Interface Handling.
+ */
+ //イベントを初期化する
+ function initializeEvent() {
+
+     $("#statusButtons input").on("click",function () {
+         console.log(this.id);
+         // $(data.currentTarget).attr("id");
+         var url;
+         var obj = {};
+         currentRequest = this.id;
+         switch (currentRequest) {
+             case "thetaStartSession":
+                 url = "/osc/commands/execute";
+                 obj.name = "camera.startSession";
+                 obj.parameters = {};
+                 break;
+             case "thetaCheckStatus":
+                 url = "/osc/state";
+                 break;
+             case "thetaGetLiveView":
+                 url = "/osc/commands/execute";
+                 obj.name = "camera._getLivePreview";
+                 obj.parameters = {
+                     "sessionId": config.SID
+                 };
+                 break;
+             case "thetaShootStill":
+                 shootImage();
+                 return;
+                 break;
+             case "thetaLoadAllImages":
+                 loadAllImages();
+                 return;
+                 break;
+             case "connectReleaseButton":
+                 connectSerialPort($('#serialPortList option:selected').text());
+                 return;
+                 break;
+             default:
+
+         }
+         sendMessage(url, obj);
+     })
+ }
+
+
+
+/*
 function loadImageList(token, num){
     console.log("loadImageList ", num);
     currentRequest = "thetaLoadImageList";
@@ -357,7 +526,9 @@ function loadImageList(token, num){
     }
     sendMessage(url, obj);
 }
+*/
 
+/*
 function loadLastImageData(){
     console.log("loadLastImageData");
     var url = "/osc/state";
@@ -376,49 +547,12 @@ function loadLastImageData(){
     });
 
 }
-
-function updateLiveView(){
-    console.log("updateLiveView");
-    if(!liveView){
-        var canvas = $("#thetaLiveView").get(0);
-        if ( ! canvas || ! canvas.getContext ) { return false; }
-        liveView = canvas.getContext('2d');
-        // liveViewImage = new Image();
-        // liveViewImage.src = liveViewURL;
-    }
-    liveView.drawImage(liveViewImage, 0, 0);
-}
-
-//Thetaへメッセージを送信する
-function sendMessage(u, o, successFunc, errorFunc, completeFunc){
-    u = "http://192.168.1.1"+u;
-    var d = JSON.stringify(o);
-    console.log(u,"\n", d);
-    if(!successFunc) successFunc = onJsonLoadSuccess;
-    if(!errorFunc) errorFunc = onJsonLoadError;
-    if(!completeFunc) completeFunc = onJsonLoadComplete;
-    $.ajax({
-        type:"post",
-        url:u,
-        data:d,
-        contentType: 'application/json',
-        dataType:"json",
-        success: successFunc,
-        error:errorFunc,
-        complete:completeFunc
-    });
-}
+*/
 
 //Thetaからの応答を処理する
 function onJsonLoadSuccess(data) {
     console.log(data);
-    /*
-    if(currentRequest!="thetaGetLiveView" && currentRequest!="thetaLoadAllImages" && data.state != "done"){
-        onJsonLoadError(data);
-        return;
-    }
-    */
-
+    return;
     switch (currentRequest) {
         case "thetaStartSession":
             config.SID = data.results.sessionId;
@@ -438,6 +572,7 @@ function onJsonLoadSuccess(data) {
             loadLastImageData();
             break;
         case "thetaLoadImageList":
+            /*
             console.log(data.results);
             console.log(data.results.entries);
             imagelist = imagelist.concat(data.results.entries);
@@ -471,6 +606,7 @@ function onJsonLoadSuccess(data) {
                     }
                 }
             }
+            */
             break;
         case "thetaLoadAllImages":
 
@@ -485,6 +621,52 @@ function onJsonLoadSuccess(data) {
 
     }
 }
+
+//Thetaへメッセージを送信する
+function sendMessage(u, o, successFunc, errorFunc, type){
+    u = "http://192.168.1.1"+u;
+    console.log(o);
+    var d = JSON.stringify(o);
+    if(!type) type = "post";
+    console.log("sendMessage", u, d, type);
+    // if(!successFunc) successFunc = onJsonLoadSuccess;
+    // if(!errorFunc) errorFunc = onJsonLoadError;
+    // if(!completeFunc) completeFunc = onJsonLoadComplete;
+    /*
+    $.ajax({
+        type:"post",
+        url:u,
+        data:d,
+        contentType: 'application/json',
+        dataType:"json",
+        timeout: 10,
+        success: successFunc,
+        error:errorFunc,
+        complete:completeFunc
+    });*/
+
+    $.ajax({
+        url: u,
+        type:type,
+        data:d,
+        contentType: 'application/json',
+        dataType: 'json',
+        timeout:10000,
+        cache: false,
+        success: function(data){
+            console.log("success : ", data);
+            if(!successFunc) onJsonLoadSuccess(data);
+            else successFunc(data);
+        },
+        error:function(data){
+            console.log("error : ", data);
+            if(!errorFunc) onJsonLoadError(data);
+            else errorFunc(data);
+        }
+    });
+}
+
+
 function onJsonLoadError() {
 
 }
