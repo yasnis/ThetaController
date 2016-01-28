@@ -67,7 +67,7 @@ $(function(){
     // checkSerialPort();
     // initializeEvent();
     step1();
-    step3();
+    // step3();
 });
 
 
@@ -310,7 +310,7 @@ function shootImage(){
 function loadImageList(token, num){
     console.log("loadImageList ", num);
     // currentRequest = "thetaLoadImageList";
-    if(num==undefined)num = 200;
+    if(num==undefined)num = 10;
     var url;
     var obj = {};
     url = "/osc/commands/execute";
@@ -329,19 +329,72 @@ function loadImageList(token, num){
         console.log("loadImageList(error) : ", data);
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     });
+    $("#thetaNotLoadedList option").remove();
 }
 
 function onLoadImageList(data) {
     console.log("loadImageList(success) : ", data);
-    // console.log(data.results.entries);
-        // return;
+    var list = data.results.entries;
+
+    var interrupt = false;
+    // var arr = config.notloadedlist;
+    console.log(config.notloadedlist.length);
+    for (var i = 0; i < list.length; i++) {
+        var uri = list[i].uri;
+        var b = false;
+        var loaded = false;
+        var added = false;
+        for (var j = 0; j < config.loadedlist.length; j++) {
+            if(config.loadedlist[j].uri == uri){
+                config.loadedlist.push(list[i]);
+                loaded = true;
+                break;
+            }
+        }
+        for (var j = 0; j < config.notloadedlist.length; j++) {
+            if(config.notloadedlist[j].uri == uri){
+                added = true;
+                break;
+            }
+        }
+        if(!loaded && !added){
+            console.log(list[i].uri, loaded, added, interrupt);
+            // var arr = config.notloadedlist;
+            // arr.push(list[i]);
+            config.notloadedlist.push(list[i]);
+            // config.notloadedlist.unshift(list[i]);
+            // console.log(config.notloadedlist.length);
+        }else{
+            interrupt = true;
+        }
+    }
+    // config.notloadedlist = arr;
+    console.log("data.results.continuationToken : ", isNaN(data.results.continuationToken*0), interrupt);
+    if(isNaN(data.results.continuationToken*0) || interrupt){
+        //以降のリストは読み込まれている
+        var list = new Array();
+        for (var i = 0; i < config.notloadedlist.length; i++) {
+            list.push(config.notloadedlist[i].uri);
+        }
+        list.sort();
+        for (var j = list.length-1; j >=0; j--) {
+            //読み込まれてないなら選択肢に追加
+            var opt = $("<option>");
+            opt.attr("value",list[j]);
+            opt.text(list[j]);
+            $("#thetaNotLoadedList").append(opt);
+        }
+        $("#thetaNotLoadedList").attr("size", Math.min(30, $("#thetaNotLoadedList option").length));
+        setTimeout(function(){setThetaButtonEnabled(true);},300);
+    }else{
+        loadImageList(data.results.continuationToken);
+    }
+
+    /*
     imagelist = imagelist.concat(data.results.entries);
-    // console.log(imagelist.length);
     if(data.results.continuationToken > 0){
         loadImageList(data.results.continuationToken);
     }else{
-        $("#thetaNotLoadedList option").remove();
-        // lastShotImage = imagelist[0].uri;
         for (var i = 0; i < imagelist.length; i++) {
             var uri = imagelist[i].uri;
             var b = false;
@@ -377,7 +430,7 @@ function onLoadImageList(data) {
 
         $("#thetaNotLoadedList").attr("size", Math.min(30, $("#thetaNotLoadedList option").length));
         setTimeout(function(){setThetaButtonEnabled(true);},300);
-    }
+    }*/
 }
 
 //まだ読み込んでない画像を全部読み込む
