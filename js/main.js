@@ -64,10 +64,9 @@ $(function(){
     $(window).on("beforeunload",function(e){
         saveConfig();
     });
-    // checkSerialPort();
-    // initializeEvent();
+    $("#appRestart").on('click', function(){location.reload();});
+    $("#appResetConfig").on('click', resetConfig);
     step1();
-    // step3();
 });
 
 
@@ -110,6 +109,23 @@ $(function(){
      });
  }
 
+ //設定を初期化
+ function resetConfig() {
+     config = {
+         "download_path":app.getPath('home')+"/Desktop/ThetaImage/",
+         "SID":null,
+         "fingerprint":null,
+         "loadedlist":new Array(),
+         "notloadedlist":new Array()
+     };
+ }
+ function loadStart() {
+     $(".loadingBorder").css("background-color", "#fff");
+ }
+ function loadEnd() {
+     $(".loadingBorder").css("background-color", "#ccc");
+ }
+
 /*
  * Step 01
  */
@@ -118,19 +134,16 @@ function step1() {
     console.log("-----------Step 01-----------");
     console.log("-----------------------------");
     searchTheta();
+
+    $("#step_01").show();
+    $("#step_02").hide();
+    $("#step_03").hide();
 }
 //Thetaを探す
 function searchTheta() {
     console.log("searchTheta");
     var url = "/osc/info";
     var obj = {};
-    /* TODO:ループ表現
-    function loading() {
-        var txt = $("#step_01 p span").text().lengh;
-        console.log($("#step_01 p span").text());
-    }
-    loading();
-    */
     sendMessage(url, obj, function(data){
             console.log("searchTheta(success) : ", data);
             $("#step_01 p").text("Thetaが見つかりました。");
@@ -138,8 +151,8 @@ function searchTheta() {
             $("#thetaStartSession").on("click", startSession);
         },function(data){
             console.log("searchTheta(error) : ", data);
-            //5秒待って再試行
-            setTimeout(searchTheta, 5000);
+            //3秒待って再試行
+            setTimeout(searchTheta, 3000);
         },
         "get"
     );
@@ -148,7 +161,7 @@ function searchTheta() {
 function startSession(){
     console.log("startSession");
     $("#thetaStartSession").attr("disabled", "disabled");
-    $("#thetaStartSession").attr("value", "接続中です");
+    $("#thetaStartSession").text("接続中...");
     $("#thetaStartSession").off("click");
 
     var url = "/osc/commands/execute";
@@ -157,12 +170,14 @@ function startSession(){
     obj.parameters = {};
     sendMessage(url, obj, function(data){
         console.log("startSession(success) : ", data);
-        $("#thetaStartSession").attr("value", "接続完了");
+        $("#thetaStartSession").text("接続完了");
         config.SID = data.results.sessionId;
         step2();
     },function(data){
+        window.alert("接続に失敗しました。Thetaとの接続をご確認ください。");
         console.log("startSession(error) : ", data);
-        $("#step_01 p").text("Thetaが見つかりました。");
+        $("#step_01 p").text("接続に失敗しました。");
+        $("#thetaStartSession").text("接続する");
         $("#thetaStartSession").removeAttr("disabled");
         $("#thetaStartSession").on("click", startSession);
     });
@@ -179,6 +194,9 @@ function step2() {
         step3();
         $("#releaseSkipButton").off('click');
     })
+        $("#step_01").hide();
+        $("#step_02").show();
+        $("#step_03").hide();
 }
 
  /*
@@ -190,6 +208,7 @@ function checkSerialPort() {
     console.log("checkSerialPort");
     serialport.list(function (err, ports) {
         var availablePort = null;
+        $("#serialPortList option").remove();
         ports.forEach(function(port) {
             var dom = $("<option>");
             dom.attr("value", port.comName);
@@ -254,6 +273,11 @@ function step3() {
     });
     $("#thetaLoadAllImages").on('click', loadAllImages);
     $("#thetaLoadSelectedImages").on('click', loadSelectedImages);
+
+
+    $("#step_01").hide();
+    $("#step_02").hide();
+    $("#step_03").show();
 }
 function setThetaButtonEnabled(b) {
     if(b){
@@ -276,20 +300,22 @@ function setThetaButtonEnabled(b) {
 //画像をダウンロードするフォルダを指定
 function setDownloadDirectory(){
     setThetaButtonEnabled(false);
+    loadStart();
     dialog.showOpenDialog({ properties: [ 'openDirectory']}, function (data) {
-        if(data[0]){
+        loadEnd();
+        console.log(data);
+        if(data){
             config.download_path = data[0]+"/";
             console.log(config.download_path);
-            setThetaButtonEnabled(true);
+            $("#thetaDownloadDirectory").attr("value", config.download_path);
         }
+        setThetaButtonEnabled(true);
     });
 }
 
 //撮影する
 function shootImage(){
     setThetaButtonEnabled(false);
-    // currentRequest = "thetaShootStill";
-    // console.log("shootImage : ", lastShotImage);
     var url;
     var obj = {};
     url = "/osc/commands/execute";
@@ -302,6 +328,7 @@ function shootImage(){
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     }, function (data) {
         console.log("shootImage(error) : ", data);
+        window.alert("撮影に失敗しました。Thetaとの接続をご確認ください。");
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     });
 }
@@ -327,6 +354,7 @@ function loadImageList(token, num){
     console.log(obj);
     sendMessage(url, obj, onLoadImageList, function (data) {
         console.log("loadImageList(error) : ", data);
+        window.alert("一覧の取得に失敗しました。Thetaとの接続をご確認ください。");
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     });
     $("#thetaNotLoadedList option").remove();
@@ -359,16 +387,12 @@ function onLoadImageList(data) {
         }
         if(!loaded && !added){
             console.log(list[i].uri, loaded, added, interrupt);
-            // var arr = config.notloadedlist;
-            // arr.push(list[i]);
             config.notloadedlist.push(list[i]);
-            // config.notloadedlist.unshift(list[i]);
-            // console.log(config.notloadedlist.length);
         }else{
             interrupt = true;
         }
     }
-    // config.notloadedlist = arr;
+
     console.log("data.results.continuationToken : ", isNaN(data.results.continuationToken*0), interrupt);
     if(isNaN(data.results.continuationToken*0) || interrupt){
         //以降のリストは読み込まれている
@@ -389,48 +413,6 @@ function onLoadImageList(data) {
     }else{
         loadImageList(data.results.continuationToken);
     }
-
-    /*
-    imagelist = imagelist.concat(data.results.entries);
-    if(data.results.continuationToken > 0){
-        loadImageList(data.results.continuationToken);
-    }else{
-        for (var i = 0; i < imagelist.length; i++) {
-            var uri = imagelist[i].uri;
-            var b = false;
-            var loaded = false;
-            var added = false;
-            for (var j = 0; j < config.loadedlist.length; j++) {
-                if(config.loadedlist[j].uri == uri){
-                    config.loadedlist.push(imagelist[i]);
-                    loaded = true;
-                    break;
-                }
-            }
-            for (var j = 0; j < config.notloadedlist.length; j++) {
-                if(config.notloadedlist[j].uri == uri){
-                    added = true;
-                    break;
-                }
-            }
-            console.log(uri, loaded, added);
-            if(!loaded){
-                console.log("not loaded : ", uri);
-                var opt = $("<option>");
-                opt.attr("value",imagelist[i].uri);
-                opt.text(imagelist[i].uri);
-                // console.log(opt);
-                // console.log($("#thetaNotLoadedList"));
-                $("#thetaNotLoadedList").append(opt);
-                if(!added){
-                    config.notloadedlist.push(imagelist[i]);
-                }
-            }
-        }
-
-        $("#thetaNotLoadedList").attr("size", Math.min(30, $("#thetaNotLoadedList option").length));
-        setTimeout(function(){setThetaButtonEnabled(true);},300);
-    }*/
 }
 
 //まだ読み込んでない画像を全部読み込む
@@ -439,8 +421,6 @@ function loadAllImages() {
     for (var i = 0; i < config.notloadedlist.length; i++) {
         loadlist.push(config.notloadedlist[i]);
     }
-    // console.log("loadAllImages : ", loadlist);
-    // currentRequest = "thetaLoadAllImages";
     loadNext();
 }
 function loadSelectedImages() {
@@ -485,6 +465,7 @@ function loadImage(img){
     request.post(o, function (error, response, body) {
         if(error){
             console.log(error);
+            window.alert("画像のダウンロードに失敗しました。Thetaとの接続をご確認ください。");
             return;
         }
         if(response.statusCode == 200){
@@ -513,166 +494,10 @@ function onLoadImageComplete() {
 /*
  * Interface Handling.
  */
- //イベントを初期化する
- function initializeEvent() {
-
-     $("#statusButtons input").on("click",function () {
-         console.log(this.id);
-         // $(data.currentTarget).attr("id");
-         var url;
-         var obj = {};
-         currentRequest = this.id;
-         switch (currentRequest) {
-             case "thetaStartSession":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera.startSession";
-                 obj.parameters = {};
-                 break;
-             case "thetaCheckStatus":
-                 url = "/osc/state";
-                 break;
-             case "thetaGetLiveView":
-                 url = "/osc/commands/execute";
-                 obj.name = "camera._getLivePreview";
-                 obj.parameters = {
-                     "sessionId": config.SID
-                 };
-                 break;
-             case "thetaShootStill":
-                 shootImage();
-                 return;
-                 break;
-             case "thetaLoadAllImages":
-                 loadAllImages();
-                 return;
-                 break;
-             case "connectReleaseButton":
-                 connectSerialPort($('#serialPortList option:selected').text());
-                 return;
-                 break;
-             default:
-
-         }
-         sendMessage(url, obj);
-     })
- }
-
-
-
-/*
-function loadImageList(token, num){
-    console.log("loadImageList ", num);
-    currentRequest = "thetaLoadImageList";
-    if(num==undefined)num = 100;
-    var url;
-    var obj = {};
-    url = "/osc/commands/execute";
-    obj.name = "camera.listImages";
-    obj.parameters = {
-        "entryCount":num,
-        "includeThumb":false
-    };
-    if(token == 0){
-        imagelist = new Array();
-    }else {
-        obj.parameters.continuationToken = token;
-    }
-    sendMessage(url, obj);
-}
-*/
-
-/*
-function loadLastImageData(){
-    console.log("loadLastImageData");
-    var url = "/osc/state";
-    var obj = {};
-    var owner = this;
-    sendMessage(url, obj, function(data){
-        if(data.state._latestFileUri == ""　|| data.state._latestFileUri == lastShotImage){
-            console.log("retry");
-            setTimeout(owner.loadLastImageData, 300);
-        }else{
-            lastShotImage = data.state._latestFileUri;
-            console.log("loadLastImageData : ", data.state._latestFileUri);
-            loadAllImageList = false;
-            loadImageList(0, 1);
-        }
-    });
-
-}
-*/
 
 //Thetaからの応答を処理する
 function onJsonLoadSuccess(data) {
     console.log(data);
-    return;
-    switch (currentRequest) {
-        case "thetaStartSession":
-            config.SID = data.results.sessionId;
-            loadImageList(0);
-            break;
-        case "thetaCheckStatus":
-            console.log("thetaCheckStatus : ",data.fingerprint);
-            config.fingerprint = data.fingerprint;
-            break;
-        case "thetaGetLiveView":
-            break;
-        case "thetaGetCameraOptions":
-            break;
-        case "thetaSetCameraOptions":
-            break;
-        case "thetaShootStill":
-            loadLastImageData();
-            break;
-        case "thetaLoadImageList":
-            /*
-            console.log(data.results);
-            console.log(data.results.entries);
-            imagelist = imagelist.concat(data.results.entries);
-            // console.log(imagelist.length);
-            if(loadAllImageList && data.results.continuationToken > 0){
-                loadImageList(data.results.continuationToken);
-            }else{
-                loadAllImageList = true;
-                lastShotImage = imagelist[0].uri;
-
-                console.log("loadComplete : ", imagelist.length);
-                for (var i = 0; i < imagelist.length; i++) {
-                    var uri = imagelist[i].uri;
-                    var loaded = false;
-                    for (var j = 0; j < config.loadedlist.length; j++) {
-                        if(config.loadedlist[j] && config.loadedlist[j].uri == uri){
-                            console.log("loaded : ", uri);
-                            config.loadedlist.push(imagelist[i]);
-                            loaded = true;
-                            break;
-                        }
-                    }
-                    for (var j = 0; j < config.notloadedlist.length; j++) {
-                        if(config.notloadedlist[j] && config.notloadedlist[j].uri == uri){
-                        break;
-                        }
-                    }
-                    if(!loaded){
-                        console.log("not loaded : ", uri);
-                        config.notloadedlist.push(imagelist[i]);
-                    }
-                }
-            }
-            */
-            break;
-        case "thetaLoadAllImages":
-
-            break;
-        case "thetaShootMovie":
-            break;
-        case "thetaStopMovie":
-            break;
-        case "thetaCheckForUpdates":
-            break;
-        default:
-
-    }
 }
 
 //Thetaへメッセージを送信する
@@ -682,22 +507,8 @@ function sendMessage(u, o, successFunc, errorFunc, type){
     var d = JSON.stringify(o);
     if(!type) type = "post";
     console.log("sendMessage", u, d, type);
-    // if(!successFunc) successFunc = onJsonLoadSuccess;
-    // if(!errorFunc) errorFunc = onJsonLoadError;
-    // if(!completeFunc) completeFunc = onJsonLoadComplete;
-    /*
-    $.ajax({
-        type:"post",
-        url:u,
-        data:d,
-        contentType: 'application/json',
-        dataType:"json",
-        timeout: 10,
-        success: successFunc,
-        error:errorFunc,
-        complete:completeFunc
-    });*/
 
+    loadStart();
     $.ajax({
         url: u,
         type:type,
@@ -707,14 +518,16 @@ function sendMessage(u, o, successFunc, errorFunc, type){
         timeout:10000,
         cache: false,
         success: function(data){
-            console.log("success : ", data);
+            // console.log("success : ", data);
             if(!successFunc) onJsonLoadSuccess(data);
             else successFunc(data);
+            loadEnd();
         },
         error:function(data){
-            console.log("error : ", data);
+            // console.log("error : ", data);
             if(!errorFunc) onJsonLoadError(data);
             else errorFunc(data);
+            loadEnd();
         }
     });
 }
