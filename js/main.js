@@ -58,14 +58,23 @@ var notloadedlist = new Array();
 var lastShotImage = "";
 
 var loadlist;
+var alertaudio;
+
+audiojs.events.ready(function() {
+    var a = audiojs.createAll();
+    alertaudio = a[0];
+});
 
 $(function(){
+    $("#alertaudio")[0].load();
+    $("#alertaudio")[0].play();
     loadConfig();
     $(window).on("beforeunload",function(e){
         saveConfig();
     });
     $("#appRestart").on('click', function(){location.reload();});
     $("#appResetConfig").on('click', resetConfig);
+    $("#errorclose a").on('click', hideError);
     step1();
 });
 
@@ -174,7 +183,7 @@ function startSession(){
         config.SID = data.results.sessionId;
         step2();
     },function(data){
-        window.alert("接続に失敗しました。Thetaとの接続をご確認ください。");
+        showError("接続に失敗しました。Thetaとの接続をご確認ください。");
         console.log("startSession(error) : ", data);
         $("#step_01 p").text("接続に失敗しました。");
         $("#thetaStartSession").text("接続する");
@@ -273,6 +282,12 @@ function step3() {
     });
     $("#thetaLoadAllImages").on('click', loadAllImages);
     $("#thetaLoadSelectedImages").on('click', loadSelectedImages);
+    window.focus();
+    $(window).on('keydown', function (e) {
+        if(e.keyCode == 13){
+            shootImage();
+        }
+    });
 
 
     $("#step_01").hide();
@@ -328,7 +343,8 @@ function shootImage(){
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     }, function (data) {
         console.log("shootImage(error) : ", data);
-        window.alert("撮影に失敗しました。Thetaとの接続をご確認ください。");
+        // window.alert("撮影に失敗しました。Thetaとの接続をご確認ください。");
+        showError("撮影に失敗しました。Thetaとの接続をご確認ください。");
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     });
 }
@@ -354,7 +370,7 @@ function loadImageList(token, num){
     console.log(obj);
     sendMessage(url, obj, onLoadImageList, function (data) {
         console.log("loadImageList(error) : ", data);
-        window.alert("一覧の取得に失敗しました。Thetaとの接続をご確認ください。");
+        showError("一覧の取得に失敗しました。Thetaとの接続をご確認ください。");
         setTimeout(function(){setThetaButtonEnabled(true);},300);
     });
     $("#thetaNotLoadedList option").remove();
@@ -456,6 +472,7 @@ function loadImage(img){
         headers: { 'Content-Type': 'application/json' },
         json: true,
         keepAlive: false,
+        timeout: 10000,
         encoding: null, // IMPORTANT
         body: { "name": "camera.getImage",
             "parameters": { "fileUri": loadingImage.uri }
@@ -465,25 +482,30 @@ function loadImage(img){
     request.post(o, function (error, response, body) {
         if(error){
             console.log(error);
-            window.alert("画像のダウンロードに失敗しました。Thetaとの接続をご確認ください。");
+            showError("画像のダウンロードに失敗しました。Thetaとの接続をご確認ください。");
+            onLoadImageComplete();
             return;
         }
-        if(response.statusCode == 200){
-            console.log(config.download_path+loadingImage.uri);
-            writeFile(config.download_path+loadingImage.uri, body, encoding="binary");
-            config.loadedlist.push(loadingImage);
-            for (var i = 0; i < config.notloadedlist.length; i++) {
-                if(config.notloadedlist[i].uri == loadingImage.uri){
-                    config.notloadedlist.splice(i,1);
-                    break;
-                }
-            }
-            loadlist.shift();
-            if(loadlist.length>0) owner.loadNext();
-            else onLoadImageComplete();
-        }else{
+        console.log("response : ", response);
+        if(response.statusCode != 200) {
+            showError("画像のダウンロードに失敗しました。"+response.statusCode);
             console.log('Connection Failure... (%d)', response.statusCode);
+            onLoadImageComplete();
+            return;
         }
+
+        // console.log(config.download_path+loadingImage.uri);
+        writeFile(config.download_path+loadingImage.uri, body, encoding="binary");
+        config.loadedlist.push(loadingImage);
+        for (var i = 0; i < config.notloadedlist.length; i++) {
+            if(config.notloadedlist[i].uri == loadingImage.uri){
+                config.notloadedlist.splice(i,1);
+                break;
+            }
+        }
+        loadlist.shift();
+        if(loadlist.length>0) owner.loadNext();
+        else onLoadImageComplete();
     })
 }
 function onLoadImageComplete() {
@@ -544,5 +566,32 @@ function writeFile (path, contents, cb) {
     if (err) return cb(err)
     fs.writeFile(path, contents, cb)
   })
+}
+
+function hideError() {
+    alertaudio.pause();
+    var h = $("#errorarea").height()+30;
+    $("#errorarea").animate({
+        // top:-h+"px"
+        opacity:0
+    },500, "easeOutCirc", function(){$("#errorarea").css("top", -h+"px");$("#errorarea").hide();$(".errormessage p").remove();});
+}
+function showError(msg) {
+    alertaudio.play();
+    var d = new Date();
+    var m = "["+zero2(d.getHours())+":"+zero2(d.getMinutes())+":"+zero2(d.getSeconds())+"] "+ msg;
+    $("#errorarea .errormessage").prepend($("<p>"+m+"</p>"));
+    $("#errorarea").css("opacity", 1);
+
+    var h = $("#errorarea").height()+30;
+    // $("#errorarea").css("top", -h+"px");
+    $("#errorarea").show();
+
+    $("#errorarea").animate({
+        top:"0px"
+    },300, "easeOutCirc");
+}
+function zero2(n) {
+    return ("0"+n).slice(-2);
 }
 //*/

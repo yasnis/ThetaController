@@ -1,8 +1,8 @@
 
 @font-face {
   font-family: "notosans";
-  src: url("css/NotoSansCJKjp-Light.eot") format('eot'),
-       url("css/NotoSansCJKjp-Light.woff") format('woff');
+  src: url("NotoSansCJKjp-Light.eot") format('eot'),
+       url("NotoSansCJKjp-Light.woff") format('woff');
 }
 
 * {
@@ -23,7 +23,7 @@ html,body {
 body {
     font-size: 120%;
     color: #333;
-    font-family: "notosans";
+    font-family: notosans;
 }
 
 #container {
@@ -121,4 +121,29 @@ input {
     position: fixed;
     bottom: 0px;
     background-color: #f3f3f3;
+}
+
+#errorarea {
+    width: 100%;
+    margin: 0;
+    padding: 20px 40px 6px;
+    position: fixed;
+    top: -74px;
+    background-color: #cc0066;
+    color: #fff;
+}
+#errorclose {
+    position: absolute;
+    right: 110px;
+    top: 21px;
+    /*background-color: #000;*/
+    /*margin-left: -100px;*/
+}
+.errormessage p {
+    /*border-bottom: solid 1px #fff;*/
+    font-size: 90%;
+    /*margin-bottom: 10px;*/
+}
+.audiojs {
+    display: none;
 }
