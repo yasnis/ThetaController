@@ -34,6 +34,7 @@ var mkdirp = require("mkdirp");
 var getDirName = require("path").dirname;
 var app = remote.require('app');
 var dialog = remote.require('dialog');
+var sizeof = require('object-sizeof');
 
 var currentRequest;
 var oldState = 0;
@@ -357,7 +358,8 @@ function loadImageList(token, num){
     var url;
     var obj = {};
     url = "/osc/commands/execute";
-    obj.name = "camera.listImages";
+    // obj.name = "camera.listImages";
+    obj.name = "camera._listAll";
     obj.parameters = {
         "entryCount":num,
         "includeThumb":false
@@ -465,8 +467,9 @@ function loadNext(){
     }
 }
 function loadImage(img){
-    console.log("loadImage : ", img.uri);
     var loadingImage = img;
+    var method = (loadingImage.uri.indexOf("MP4")==-1)?"camera.getImage":"camera._getVideo";
+    console.log("loadImage : ", img.uri, method, (loadingImage.uri.indexOf("MP4")));
     var o = {
         uri: 'http://192.168.1.1/osc/commands/execute',
         headers: { 'Content-Type': 'application/json' },
@@ -474,11 +477,18 @@ function loadImage(img){
         keepAlive: false,
         timeout: 10000,
         encoding: null, // IMPORTANT
-        body: { "name": "camera.getImage",
+        body: { "name": method,
             "parameters": { "fileUri": loadingImage.uri }
         }
     };
     var owner = this;
+    // request.on();
+
+    // var source = fs.createReadStream(config.download_path+".tmp");
+    // source.pipe(request.post(o));
+    // return;
+    var loadedBytes = 0;
+    var totalBytes = 0;
     request.post(o, function (error, response, body) {
         if(error){
             console.log(error);
@@ -506,7 +516,18 @@ function loadImage(img){
         loadlist.shift();
         if(loadlist.length>0) owner.loadNext();
         else onLoadImageComplete();
-    })
+    }).on('data',function(response) {
+        // ;
+        loadedBytes += sizeof(response);
+        var p = Math.round(loadedBytes/totalBytes*1000)/10;
+        console.log(p + "% loaded ("+loadedBytes+"bytes / "+totalBytes+"bytes)"); // 200
+        // console.log(response.statusCode) // 200
+        // console.log(response.headers['content-type']) // 'image/png'
+    }).on('response',function(response){
+        totalBytes = Number(response.headers["content-length"]);
+        console.log(response.headers["content-length"]);
+        console.log("totalBytes : "+sizeof(response.body));
+    });
 }
 function onLoadImageComplete() {
     console.log("onLoadImageComplete");
